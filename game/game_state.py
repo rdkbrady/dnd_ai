@@ -1,5 +1,3 @@
-h = 30
-w = 30
 
 import numpy as np
 
@@ -47,44 +45,48 @@ def batch_data_for_ai(h, w, batch_size = 100):
         yield X, y
         
 class Game_Environment:
+    action_space = range(9)
+    
     def __init__(self, h, w):
         self.h = h
         self.w = w
-        self.action_space = range(9)
+        self.d = 1
         self.reset()
         
     def reset(self): # randomize new initial state
         self.reward = 0
         state = np.zeros(shape = [self.h * self.w, 3])
-        player_pos, enemy_pos = np.random.choice(np.arange(h * w), 2, False)
+        player_pos = np.random.choice(np.arange(self.h * self.w))
         state[player_pos, 1] = 1
-        state[enemy_pos, 0] = 1
-        self.state = state.reshape(h,w,3)
-        self.player_pos = np.array([player_pos // w, player_pos % w])
-        self.enemy_pos = np.array([enemy_pos // w, enemy_pos % w])
-        return self.state
-    
-    def step(self, action): # change state by one action step
-        info = {}
-        done = False
+        self.player_pos = np.array([player_pos // self.w, player_pos % self.w])
+        self.state = state.reshape(self.h, self.w, 3)
+        enemy_pos = [-1, -1]
         
+        while (enemy_pos[0] < 0) | (enemy_pos[0] >= self.w) | (enemy_pos[1] < 0) | (enemy_pos[1] >= self.h) | np.array_equal(enemy_pos, self.player_pos):
+            enemy_pos[0] = self.player_pos[0] + np.random.randint(-self.d, self.d + 1)
+            enemy_pos[1] = self.player_pos[1] + np.random.randint(-self.d, self.d + 1)  
+        self.state[enemy_pos[0], enemy_pos[1], 0] = 1
+        self.enemy_pos = enemy_pos
+        self.d = min(self.d + 1, self.h, self.w)
+        self.done = False
+
+    
+    def step(self, action): 
         new_player_pos = self.player_pos + np.array([(action // 3) - 1, (action % 3) - 1])
-        info['start_pos'] = self.player_pos
-        info['target_pos'] = new_player_pos
-        if (new_player_pos[0] == w) | (new_player_pos[0] < 0) | (new_player_pos[1] == h) | (new_player_pos[1] < 0) | (action == 4):
-            reward = -100
-            info['result'] = 'bad move'
+        
+        if (new_player_pos[0] == self.w) | (new_player_pos[0] < 0) | (new_player_pos[1] == self.h) | (new_player_pos[1] < 0) | (action == 4):
+            reward = -1
+
         else:
             self.state[self.player_pos[0], self.player_pos[1], 1] = 0
             self.state[new_player_pos[0], new_player_pos[1], 1] = 1
-            reward = np.sum(np.square(self.player_pos - self.enemy_pos)) - np.sum(np.square(new_player_pos - self.enemy_pos)) -1
+            reward = -0.05 * (3 - action % 2)
             self.player_pos = new_player_pos
-            info['result'] = 'moved'
             
             if np.array_equal(new_player_pos, self.enemy_pos):
-                done = True
-                info['result'] = 'won'
+                self.done = True
+                reward = 1
         
-        return self.state, reward, done, info
+        return reward
         
         
